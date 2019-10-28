@@ -81,9 +81,8 @@ const request=(path,extraHeaders,form)=>new Promise((resolve,reject)=>{
   };
   if(extraHeaders) options.headers = extraHeaders;
   if(form){
-    options.headers = Object.fromEntries(
-      [...Object.entries(options.headers||{}),['Content-Type','application/x-www-form-urlencoded']]
-    );
+    options.headers = Object.assign({}, options.headers||{});
+    options.headers['Content-Type'] = 'application/x-www-form-urlencoded';
   }
   const request = http.request(options);
   const data = [];
