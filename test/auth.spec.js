@@ -297,7 +297,6 @@ describe('Login', ()=>{
     assert.strictEqual(response5.status, 401);
     assert.strictEqual(response5.headers.get('content-type'), 'text/html');
     assert.strictEqual(response5.headers.get('content-encoding'), 'identity');
-
   });
   it('Unknown user', async()=>{
     const username = 'unknown';
