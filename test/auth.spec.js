@@ -280,6 +280,7 @@ describe('Login', ()=>{
     const response1 = await request('/test');
     assert.strictEqual(response1.status, 401);
     assert.strictEqual(response1.headers.get('content-type'), 'text/html');
+    assert.strictEqual(response1.headers.get('content-encoding'), 'identity');
     const response2 = await request('/test', { 'Accept-Encoding': 'gzip' });
     assert.strictEqual(response2.status, 401);
     assert.strictEqual(response2.headers.get('content-type'), 'text/html');
@@ -288,6 +289,14 @@ describe('Login', ()=>{
     assert.strictEqual(response3.status, 401);
     assert.strictEqual(response3.headers.get('content-type'), 'text/html');
     assert.strictEqual(response3.headers.get('content-encoding'), 'br');
+    const response4 = await request('/test', { 'Accept-Encoding': 'gzip, br' });
+    assert.strictEqual(response4.status, 401);
+    assert.strictEqual(response4.headers.get('content-type'), 'text/html');
+    assert.strictEqual(response4.headers.get('content-encoding'), 'br');
+    const response5 = await request('/test', { 'Accept-Encoding': 'identity' });
+    assert.strictEqual(response5.status, 401);
+    assert.strictEqual(response5.headers.get('content-type'), 'text/html');
+    assert.strictEqual(response5.headers.get('content-encoding'), 'identity');
   });
   it('Unknown user', async()=>{
     const username = 'unknown';
