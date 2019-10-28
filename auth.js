@@ -155,13 +155,17 @@ const createNonce=(privateKey,realm)=>{
  * @returns {boolean}
  */
 const validateNonce=(privateKey,realm,nonce)=>{
-  const text=crypto.publicDecrypt(privateKey,b64urlDecode(nonce)).toString();
-  if(text.indexOf(realm)!==0) return false;
-  if(text.charAt(realm.length)!=='|') return false;
-  const i=text.indexOf('|',realm.length+1);
-  if(i===-1) return false;
-  const dt=new Date().getTime()-parseInt(text.substring(realm.length+1,i));
-  return dt<60000;
+  try{
+    const text=crypto.publicDecrypt(privateKey,b64urlDecode(nonce)).toString();
+    if(text.indexOf(realm)!==0) return false;
+    if(text.charAt(realm.length)!=='|') return false;
+    const i=text.indexOf('|',realm.length+1);
+    if(i=== -1) return false;
+    const dt=new Date().getTime()-parseInt(text.substring(realm.length+1,i));
+    return dt<60000;
+  }catch(ignore){
+    return false;
+  }
 };
 
 /**
@@ -360,7 +364,7 @@ p.addEventListener('keydown',e=>{
             const username=params['username'];
             const hash=params['hash'];
             const nonce=params['nonce'];
-            if(validateNonce(privateKey,realm,nonce)){
+            if(username&&hash&&nonce&&validateNonce(privateKey,realm,nonce)){
               const data=await options.authenticate(username,hash);
               if(data===null){
                 loginPage(request,response);

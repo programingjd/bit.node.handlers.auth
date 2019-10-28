@@ -10,6 +10,10 @@ const port = 8080;
 const privateKeyContent=fs.readFileSync('test/key.pem');
 const privateKeySha256=crypto.createHash("SHA256").update(privateKeyContent.toString()).digest().toString();
 
+const encrypt=(text)=>{
+  return b64urlEncode(crypto.privateEncrypt(crypto.createPrivateKey(privateKeyContent),Buffer.from(text)));
+};
+
 /**
  * @param {string} data
  * @returns {string}
@@ -226,6 +230,40 @@ describe('Nonce', ()=>{
     assert.strictEqual(entries.length, nonces.length);
     entries.forEach(it=>assert.strictEqual(it[1],1));
   });
+  it('Nonce with incorrect realm', async()=>{
+    const text1 = `realm|${new Date().getTime()}|${crypto.randomBytes(8).toString('base64')}`;
+    const nonce1 = encrypt(text1);
+    const username = 'tester1';
+    const hash = credentials.tester1.hash;
+    const response1 = await request('/.auth/test/login', null,{ username, hash, nonce: nonce1 });
+    assert.strictEqual(response1.status, 400);
+    const text2 = `testing|${new Date().getTime()}|${crypto.randomBytes(8).toString('base64')}`;
+    const nonce2 = encrypt(text2);
+    const response2 = await request('/.auth/test/login', null,{ username, hash, nonce: nonce2 });
+    assert.strictEqual(response2.status, 400);
+  });
+  it('Nonce with no random bytes', async()=>{
+    const text = `realm|${new Date().getTime()}`;
+    const nonce = encrypt(text);
+    const username = 'tester1';
+    const hash = credentials.tester1.hash;
+    const response = await request('/.auth/test/login', null,{ username, hash, nonce });
+    assert.strictEqual(response.status, 400);
+  });
+  it('Expired nonce', async()=>{
+    const nonce = 'JE8zbRSy1XSvMG1EE0L6J0RLkkvj_1j8NkURXf1EnEA6cBHxtmMm1NEQecS6LMmR0MTY3vsiV-pDCplsJwv7xw';
+    const username = 'tester1';
+    const hash = credentials.tester1.hash;
+    const response = await request('/.auth/test/login', null,{ username, hash, nonce });
+    assert.strictEqual(response.status, 400);
+  });
+  it('Dummy nonce', async()=>{
+    const nonce='nonce';
+    const username = 'tester1';
+    const hash = credentials.tester1.hash;
+    const response = await request('/.auth/test/login', null,{ username, hash, nonce });
+    assert.strictEqual(response.status, 400);
+  });
 });
 describe('Login', ()=>{
   it('Unknown user', async()=>{
@@ -241,6 +279,24 @@ describe('Login', ()=>{
     const nonce = await getNonce();
     const response = await request('/.auth/test/login', null,{ username, hash, nonce });
     assert.strictEqual(response.status, 401);
+  });
+  it('Missing username', async()=>{
+    const hash = credentials.tester2.hash;
+    const nonce = await getNonce();
+    const response = await request('/.auth/test/login', null,{ hash, nonce });
+    assert.strictEqual(response.status, 400);
+  });
+  it('Missing password hash', async()=>{
+    const username = 'tester1';
+    const nonce = await getNonce();
+    const response = await request('/.auth/test/login', null,{ username, nonce });
+    assert.strictEqual(response.status, 400);
+  });
+  it('Missing nonce', async()=>{
+    const username = 'tester1';
+    const hash = credentials.tester1.hash;
+    const response = await request('/.auth/test/login', null,{ username, hash });
+    assert.strictEqual(response.status, 400);
   });
   it('Correct password', async()=>{
     const username = 'tester1';
