@@ -388,7 +388,6 @@ p.addEventListener('keydown',e=>{
         }
       }
       else{
-        if(!handler||!acceptor) throw new Error();
         const cookies=request.headers['cookie']||'';
         const i=cookies.indexOf(cookieStart);
         if(i===-1) loginPage(request,response);
