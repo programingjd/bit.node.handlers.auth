@@ -13,10 +13,10 @@ Node.js module.
 
 ```javascript
 const http = require('http');
-const staticDirectory = require('@bit/programingjd.node.handlers.static');
+const auth = require('@bit/programingjd.node.handlers.auth');
 
 (async()=>{
-  const handler = await staticDirectory({root: 'www'});
+  const handler = await auth({});
   http.createServer((request, response)=>{
     const accepted = handler.accept(request, response, 'not_used', request.connection.remoteAddress);
     if (accepted) {
