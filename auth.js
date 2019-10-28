@@ -127,15 +127,19 @@ const jwtDecode=(privateKeySha256,jwt)=>{
   if(jwt.indexOf(jwtHeaderBase64)===-1||jwt.indexOf('.')!==jwtHeaderBase64.length) return null;
   const index=jwt.indexOf('.',jwtHeaderBase64.length+1);
   if(index===-1) return null;
-  const signature=jwt.substring(index+1);
-  const hmac=crypto.createHmac('SHA256',privateKeySha256);
-  if(signature!==b64urlEncode(hmac.update(jwt.substring(0,index)).digest())) return null;
-  const payload=JSON.parse(b64urlDecode(jwt.substring(jwtHeaderBase64.length+1,index)).toString());
-  return {
-    username: payload.sub,
-    timestamp: payload.iat,
-    data: payload.data
-  };
+  try{
+    const signature=jwt.substring(index+1);
+    const hmac=crypto.createHmac('SHA256',privateKeySha256);
+    if(signature!==b64urlEncode(hmac.update(jwt.substring(0,index)).digest())) return null;
+    const payload=JSON.parse(b64urlDecode(jwt.substring(jwtHeaderBase64.length+1,index)).toString());
+    return {
+      username:payload.sub,
+      timestamp:payload.iat,
+      data:payload.data
+    };
+  }catch{
+    return null;
+  }
 };
 
 /**

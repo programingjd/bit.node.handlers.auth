@@ -272,9 +272,22 @@ describe('Nonce', ()=>{
   });
 });
 describe('Login', ()=>{
-  it('get request', async()=>{
+  it('direct get request to login endpoint', async()=>{
     const response = await request('/.auth/test/login');
     assert.strictEqual(response.status, 405);
+  });
+  it('Login page', async()=>{
+    const response1 = await request('/test');
+    assert.strictEqual(response1.status, 401);
+    assert.strictEqual(response1.headers.get('content-type'), 'text/html');
+    const response2 = await request('/test', { 'Accept-Encoding': 'gzip' });
+    assert.strictEqual(response2.status, 401);
+    assert.strictEqual(response2.headers.get('content-type'), 'text/html');
+    assert.strictEqual(response2.headers.get('content-encoding'), 'gzip');
+    const response3 = await request('/test', { 'Accept-Encoding': 'gzip, br' });
+    assert.strictEqual(response3.status, 401);
+    assert.strictEqual(response3.headers.get('content-type'), 'text/html');
+    assert.strictEqual(response3.headers.get('content-encoding'), 'br');
   });
   it('Unknown user', async()=>{
     const username = 'unknown';
@@ -336,6 +349,18 @@ describe('Login', ()=>{
     const cookie2 = 'auth_token_dGVzdA=test; SameSite; HttpOnly;';
     const response2 = await request('/test', { cookie: cookie2 });
     assert.strictEqual(response2.status, 401);
+    const cookie3 = 'auth_token_dGVzdA=eyJhbGciOiJIUzI1NiIsInR5cCI6Imp3dCJ9; SameSite; HttpOnly;';
+    const response3 = await request('/test', { cookie: cookie3 });
+    assert.strictEqual(response3.status, 401);
+    const cookie4 = 'auth_token_dGVzdA=eyJhbGciOiJIUzI1NiIsInR5cCI6Imp3dCJ9.dummy; SameSite; HttpOnly;';
+    const response4 = await request('/test', { cookie: cookie4 });
+    assert.strictEqual(response4.status, 401);
+    const cookie5 = 'auth_token_dGVzdA=eyJhbGciOiJIUzI1NiIsInR5cCI6Imp3dCJ9.dummy.signature; SameSite; HttpOnly;';
+    const response5 = await request('/test', { cookie: cookie5 });
+    assert.strictEqual(response5.status, 401);
+    const cookie6 = 'auth_token_dGVzdA=eyJhbGciOiJIUzI1NiIsInR5cCI6Imp3dCJ9.test.LpPTzNr7-lVjG61BA9_3W8FbhLbvqMuBnfQxvmldWFA; SameSite; HttpOnly;';
+    const response6 = await request('/test', { cookie: cookie6 });
+    assert.strictEqual(response6.status, 401);
   });
   it('Invalid jwt signature', async()=>{
     const jwt = 'eyJhbGciOiJIUzI1NiIsInR5cCI6Imp3dCJ9.eyJzdWIiOiJ0ZXN0ZXIxIiwiaWF0IjoxNTcyMjEzMTY3NDM0LCJkYXRhIjp7ImRhdGEiOnsibmFtZSI6IlRlc3RlciAxIiwiaWQiOjF9LCJ0b2tlbiI6ImEifX0.WDfx1h8QzB58nf7Obiij2txw0ro2mkCuqV8wf4fdAv4';
@@ -344,7 +369,7 @@ describe('Login', ()=>{
     assert.strictEqual(response.status, 401);
   });
   it('Validation', async()=>{
-    const username='tester1';
+    const username = 'tester1';
     const hash=credentials.tester1.hash;
     const nonce=await getNonce();
     const response1 = await request('/.auth/test/login', null,{ username, hash, nonce });
@@ -384,12 +409,15 @@ describe('Login', ()=>{
     assert.strictEqual((new Date().getTime()-payload.iat)<250, true);
     assert.deepStrictEqual(payload.data.token,credentials.tester2.token);
     assert.strictEqual(payload.data.data.id,4);
+    delete(credentials.tester2);
+    const response4 = await request('/test', { cookie: cookie1 });
+    assert.strictEqual(response4.status, 401);
   });
 });
 describe('Logout', ()=>{
   it('Clear cookie', async()=>{
-    const username='tester2';
-    const hash=credentials.tester2.hash;
+    const username='tester1';
+    const hash=credentials.tester1.hash;
     const nonce=await getNonce();
     const response1 = await request('/.auth/test/login', null,{ username, hash, nonce });
     assert.strictEqual(response1.status, 303);
