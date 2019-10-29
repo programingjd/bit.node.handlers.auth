@@ -1,4 +1,3 @@
-const http2=require('http');
 const fs=require('fs').promises;
 const zlib=require('zlib');
 const crypto=require('crypto');
@@ -51,7 +50,7 @@ const Encodings={
 /**
  * Returns the best supported encoding.
  * @private
- * @param {http2.IncomingHttpHeaders} headers
+ * @param {IncomingHttpHeaders} headers
  * @returns {Encodings}
  */
 const bestSupportedEncoding=headers=>{
@@ -65,7 +64,7 @@ const bestSupportedEncoding=headers=>{
 };
 
 /**
- * @param {http2.IncomingMessage} request
+ * @param {IncomingMessage} request
  * @returns {Promise<string>}
  */
 const body=async request=>new Promise(resolve=>{
@@ -173,91 +172,16 @@ const validateNonce=(privateKey,realm,nonce)=>{
 };
 
 /**
- * @name UserInfo
- * @typedef {Object<string,*>} UserInfo
- * @property {string} password
- * @property {Object<string,*>} [data]
+ * @param {string} realm
+ * @param {string} styles
+ * @returns {Buffer}
  */
-
-/**
- * @name RealmOptions
- * @template T
- * @typedef {Object<string,*>} RealmOptions
- * @property {string} [realm]
- * @property {{path:string}} privateKey
- * @property {function(username:string,passwordSha256b64:string):Promise<T|null>} authenticate
- * @property {function(username:string):Promise<T|null} getUserData
- * @property {function(username:string,userData:T):Promise<boolean>} revalidate
- * @property {number} [revalidateAfter]
- * @property {number} [updateUserDataAfter]
- * @property {{httpOnly:boolean?,secure:boolean?,path:string?}} [cookie]
- * @property {{page:{styles:string}}} login
- */
-
-/**
- * @name AuthAcceptor
- * @template T
- * @typedef {Object<string,*>} AuthAcceptor
- * @property {http2.IncomingMessage} request
- * @property {http2.ServerResponse} response
- * @property {string} hostname
- * @property {
- *   {
- *     accept: function(
- *       request:http2.IncomingMessage,
- *       response:http2.ServerResponse,
- *       hostname:string,
- *       remoteAddress:string
- *     ):T,
- *     handle:function(T)
- *   }
- * } handler
- * @property {T} acceptor
- */
-
-/**
- * @template T
- * @template A
- * @param {RealmOptions} options
- * @param {
- *   ...{
- *     accept:function(
- *       request:http2.IncomingMessage,
- *       response:http2.ServerResponse,
- *       hostname:string,
- *       remoteAddress:string
- *     ):A?,
- *     handle:function(A)
- *   }
- * } handlers
- * @returns {
- *   Promise<{
- *     accept: function(
- *       request:http2.IncomingMessage,
- *       response:http2.ServerResponse,
- *       hostname:string,
- *       remoteAddress:string
- *     ):T?,
- *     handle:function(T)
- *   }>
- * }
- */
-module.exports=async (options,...handlers)=>{
-  const { realm='default' }=options;
-  const revalidateAfter=
-    typeof options.revalidateAfter==='number'?options.revalidateAfter:Number.MAX_SAFE_INTEGER;
-  const updateUserDataAfter=
-    typeof options.updateUserDataAfter==='number'?options.updateUserDataAfter:Number.MAX_SAFE_INTEGER;
-  const privateKeyContent=await fs.readFile(options.privateKey.path);
-  const privateKey=crypto.createPrivateKey(privateKeyContent);
-  const privateKeySha256=crypto.createHash("SHA256").update(privateKeyContent.toString()).digest().toString();
-  const loginData=Buffer.from(
-    `<!doctype html>
+const defaultLoginPage=async(realm,styles)=>Buffer.from(
+  `<!doctype html>
 <html>
 <head>
 <meta charset="UTF-8">
-<title>${options.realm||'Login'}</title>
-<script src="/.auth/${encodeURIComponent(realm)}/nonce"></script>
+<title>Login</title>
 <style>
 html{font:calc(1vmin + 1vmax) sans-serif;width:100%;height:100%;margin:0;padding:0;background:#eee}
 body{
@@ -271,7 +195,7 @@ form{
 }
 input{font-size:inherit;padding:.25em .5em}
 button{font-size:inherit;padding:.5em 1em;margin-top:1em}
-${((options.login||{}).page||{}).styles||''}
+${styles}
 </style>
 </head>
 <body>
@@ -289,22 +213,103 @@ const sha256b64=async data=>{
 };
 const f=document.forms.namedItem('login');
 const p=f.querySelector('input[type=password]');
+const nonce=async()=>await(await(fetch('/.auth/${encodeURIComponent(realm)}/nonce'))).text();
 const u=async _=>{
   console.log('submit');
-  f.nonce.value=nonce;
   f.hash.value=await sha256b64(p.value);
 };
+f.addEventListener('submit',e=>{
+  e.preventDefault();
+  nonce().then(it=>{f.nonce.value=it;f.submit()});
+});
 p.addEventListener('change',u,false);
 p.addEventListener('keydown',e=>{
   if(e.key==='Enter'&&f.username.value){
     e.preventDefault();
-    u().then(_=>f.submit());
+    u().then(async()=>f.nonce.value=await nonce()).then(_=>f.submit());
   }
 });
 </script>
 </body>
 </html>`
-  );
+);
+
+/**
+ * @name UserInfo
+ * @typedef {Object<string,*>} UserInfo
+ * @property {string} password
+ * @property {Object<string,*>} [data]
+ */
+
+/**
+ * @name AuthAcceptor
+ * @template T
+ * @typedef {Object<string,*>} AuthAcceptor
+ * @property {IncomingMessage} request
+ * @property {ServerResponse} response
+ * @property {string} hostname
+ * @property {
+ *   {
+ *     accept: function(
+ *       request:IncomingMessage,
+ *       response:ServerResponse,
+ *       hostname:string,
+ *       remoteAddress:string
+ *     ):T,
+ *     handle:function(T)
+ *   }
+ * } handler
+ * @property {T} acceptor
+ */
+
+/**
+ * @template T
+ * @template B
+ * @template A
+ * @param {{
+ *   realm:string?,
+ *   privateKey:{path:string},
+ *   authenticate:function(username:string,passwordHash:string):Promise<B|null>,
+ *   getUserData:function(username:string):Promise<B|null>,
+ *   revalidate:function(username:string,userData:B):Promise<boolean>,
+ *   revalidateAfter:number?,
+ *   updateUserDataAfter:number?,
+ *   cookie:{httpOnly:boolean?,secure:boolean?,path:string?}?,
+ *   loginPage:{styles:string?,content:function():Promise<string>?}?
+ * }} options
+ * @param {
+ *   ...{
+ *     accept:function(
+ *       request:IncomingMessage,
+ *       response:ServerResponse,
+ *       hostname:string,
+ *       remoteAddress:string
+ *     ):A?,
+ *     handle:function(A)
+ *   }
+ * } handlers
+ * @returns {
+ *   Promise<{
+ *     accept: function(
+ *       request:IncomingMessage,
+ *       response:ServerResponse,
+ *       hostname:string,
+ *       remoteAddress:string
+ *     ):T?,
+ *     handle:function(T)
+ *   }>
+ * }
+ */
+module.exports=async (options,...handlers)=>{
+  const { realm='default' }=options;
+  const revalidateAfter=
+    typeof options.revalidateAfter==='number'?options.revalidateAfter:Number.MAX_SAFE_INTEGER;
+  const updateUserDataAfter=
+    typeof options.updateUserDataAfter==='number'?options.updateUserDataAfter:Number.MAX_SAFE_INTEGER;
+  const privateKeyContent=await fs.readFile(options.privateKey.path);
+  const privateKey=crypto.createPrivateKey(privateKeyContent);
+  const privateKeySha256=crypto.createHash("SHA256").update(privateKeyContent.toString()).digest().toString();
+  const loginData=await ((options.loginPage||{}).content||defaultLoginPage)(realm,(options.loginPage||{}).styles||'');
   const login={
     identity: loginData,
     gz: await gz(loginData),
@@ -320,8 +325,8 @@ p.addEventListener('keydown',e=>{
     ' SameSite=Strict;';
   const clearCookie=`${cookieStart}; expires=Thu, 01 Jan 1970 00:00:00 GMT; ${cookieOptions}`;
   /**
-   * @param {http2.IncomingMessage} request
-   * @param {http2.ServerResponse} response
+   * @param {IncomingMessage} request
+   * @param {ServerResponse} response
    */
   const loginPage=(request,response)=>{
     if(request.method.toLowerCase()==='post'){
@@ -355,8 +360,8 @@ p.addEventListener('keydown',e=>{
   };
   return {
     /**
-     * @param {http2.IncomingMessage} request
-     * @param {http2.ServerResponse} response
+     * @param {IncomingMessage} request
+     * @param {ServerResponse} response
      * @param {string} hostname
      * @param {string} remoteAddress
      * @returns {AuthAcceptor|null}
@@ -383,7 +388,7 @@ p.addEventListener('keydown',e=>{
       else if(request.url===noncePath){
         response.writeHead(200,{'Content-Type':'application/javascript'});
         const nonce=createNonce(privateKey,realm);
-        response.end(`const nonce='${nonce}';`);
+        response.end(nonce);
       }
       else{
         const cookies=request.headers['cookie']||'';
@@ -415,7 +420,7 @@ p.addEventListener('keydown',e=>{
           }
         }
       }
-    },
+    }
   };
 
 };

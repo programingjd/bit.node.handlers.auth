@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Unprotected</title>
+<style>
+html{margin:0;padding:0;width:100%;height:100%;font:calc(1vw + 1vh) sans-serif;background:#eee}
+body{min-width:100%;min-height:100%;display:flex;justify-content:center;align-items:center;margin:0;padding:2em;box-sizing:border-box}
+a.login{position:absolute;right:0;top:0;padding:1em}
+div.login{position:absolute;top:0;right:0;bottom:0;left:0;background:rgba(0,0,0,.25);transition:opacity 1600ms ease-in;display:flex;justify-content:center;align-items:center}
+div.login.hidden{display:none;opacity:0}
+div.login>form{
+  padding:2em;border-radius:1em;background:#eee;
+  display:grid;grid-template-columns:auto;grid-template-rows:repeat(3,auto);grid-gap:.5em;
+  justify-content:center;justify-items:center;align-items:center;align-content:center;
+}
+input{font-size:inherit;padding:.25em .5em}
+button{font-size:inherit;padding:.5em 1em;margin-top:.5em}
+</style>
+</head>
+<body>
+<a class="login" href="javascript:login()">Login</a>
+Unprotected page content
+<div class="hidden login">
+<form name="login" method="post">
+<input required name="username" type="text" autocomplete="username" placeholder="username">
+<input required type="password" autocomplete="current-password" placeholder="password">
+<input type="hidden" name="hash">
+<input type="hidden" name="nonce">
+<button type="submit">Login</button>
+</form>
+</div>
+<script>
+function login(){
+  (async()=>{
+    const div=document.querySelector('div.login');
+    div.classList.remove('hidden');
+    div.addEventListener('click',e=>{
+      if(e.target===div) div.classList.add('hidden');
+    },false);
+    const f=document.forms.namedItem('login');
+    const p=f.querySelector('input[type=password]');
+    const sha1=async data=>{
+      const hash=await crypto.subtle.digest('SHA-1',new TextEncoder().encode(data));
+      return Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,'0')).join('');
+    };
+    const nonce=async()=>await(await(fetch('/.auth/default/nonce'))).text();
+    const u=async _=>{
+      console.log('submit');
+      f.hash.value=await sha1(p.value);
+    };
+    f.addEventListener('submit',e=>{
+      e.preventDefault();
+      nonce().then(it=>{f.nonce.value=it;f.submit()});
+    });
+    p.addEventListener('change',u,false);
+    p.addEventListener('keydown',e=>{
+      if(e.key==='Enter'&&f.username.value){
+        e.preventDefault();
+        u().then(async()=>f.nonce.value=await nonce()).then(_=>f.submit());
+      }
+    });
+  })();
+}
+</script>
+</body>
+</html>

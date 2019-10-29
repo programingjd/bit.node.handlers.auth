@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Protected</title>
+<style>
+html{margin:0;padding:0;width:100%;height:100%;font:calc(1vw + 1vh) sans-serif;background:#eee}
+body{min-width:100%;min-height:100%;display:flex;justify-content:center;align-items:center;margin:0;padding:2em;box-sizing:border-box}
+a#logout{position:absolute;right:0;top:0;padding:1em}
+</style>
+</head>
+<body>
+<a id="logout" href="javascript:logout()">Logout</a>
+Protected page content for&nbsp;<span class="username"></span>
+<script>
+const cookie=document.cookie;
+const prefix='auth_token_ZGVmYXVsdA=';
+const i=cookie.indexOf(prefix)+prefix.length;
+const j=cookie.indexOf(';',i);
+const jwt=j===-1?cookie.substring(i):cookie.substring(i,j);
+const data=JSON.parse(atob(jwt.replace(/^([^.]+)[.]([^.]+)[.]([^.]+)$/g,'$2').replace('-','+').replace('_','/')));
+document.querySelectorAll('.username').forEach(it=>it.textContent=data.data.name);
+function logout(){fetch('/.auth/default/logout').then(_=>window.location.reload())}
+</script>
+</body>
+</html>

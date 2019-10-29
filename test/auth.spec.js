@@ -210,10 +210,7 @@ after(()=>{
 
 const getNonce=async()=>{
   const response = await request('/.auth/test/nonce');
-  const body = response.body.toString();
-  const prefix = 'const nonce=\'';
-  const suffix = '\';';
-  return body.substring(prefix.length,body.length-suffix.length);
+  return response.body.toString();
 };
 describe('Unhandled request', ()=>{
   it('Request to /not_handlers', async()=>{
@@ -233,13 +230,8 @@ describe('Nonce', ()=>{
     const response = await request('/.auth/test/nonce');
     assert.strictEqual(response.status, 200);
     assert.strictEqual(response.headers.get('content-type'), 'application/javascript');
-    const body = response.body.toString();
-    const prefix = 'const nonce=\'';
-    const suffix = '\';';
-    const start = body.indexOf(prefix);
-    assert.strictEqual(start, 0);
-    const end = body.indexOf(suffix,prefix.length);
-    assert.strictEqual(end,body.length-suffix.length);
+    const nonce = response.body.toString();
+    assert.notStrictEqual(0, nonce.length);
   });
   it('Nonce changes every time', async()=>{
     const nonces = [ await getNonce(), await getNonce(), await getNonce(), await getNonce() ];

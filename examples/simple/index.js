@@ -1,4 +1,4 @@
-const auth = require('../auth');
+const auth = require('../../auth');
 const http = require('http');
 const fs = require('fs').promises;
 
@@ -9,14 +9,14 @@ const fs = require('fs').promises;
   };
   const users={
     'user1': {
-      passwordSha256b64: sha256b64('password1'),
+      passwordHash: sha256b64('password1'),
       data: {
         name: 'User 1',
         id: 1
       }
     },
     'user2': {
-      passwordSha256b64: sha256b64('password2'),
+      passwordHash: sha256b64('password2'),
       data: {
         name: 'User 2',
         id: 2
@@ -31,9 +31,9 @@ const fs = require('fs').promises;
       cookie: {
         secure: false
       },
-      authenticate: async(username,passwordSha256b64)=>{
+      authenticate: async(username,passwordHash)=>{
         const user = users[username];
-        return user && passwordSha256b64 === user.passwordSha256b64 ? user.data : null;
+        return user && passwordHash === user.passwordHash ? user.data : null;
       },
       getUserData: async(username)=>{
         const user = users[username];
@@ -43,15 +43,15 @@ const fs = require('fs').promises;
     },
     {
       accept(request, response){
-        const page = [ 'page1', 'page2' ].find(it=>request.url===`/${it}`);
-        if(page) return { response, page };
+        const file = { '/': 'index.html' }[request.url];
+        if(file) return { response, file };
         return null;
       },
       handle(acceptor){
-        const { response, page } = acceptor;
+        const { response, file } = acceptor;
         response.writeHead(200, { 'Content-Type': 'text/html', 'Cache-Control': 'no-cache' });
         (async()=>{
-          const content = await fs.readFile(`${page}.html`);
+          const content = await fs.readFile(file);
           response.end(content);
         })();
       }
