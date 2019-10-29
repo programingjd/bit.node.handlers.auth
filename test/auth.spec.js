@@ -116,6 +116,18 @@ const request=(path,extraHeaders,form)=>new Promise((resolve,reject)=>{
   request.end();
 });
 
+const requestFollowRedirect=async(path,extraHeaders,form)=>{
+  let n = 3;
+  while(--n > 0){
+    const response = await request(path, extraHeaders,form);
+    if(response.status===303){
+      path = response.headers.get('location');
+      form = undefined;
+    }
+    else return response;
+  }
+};
+
 let server;
 
 const credentials = {
@@ -144,9 +156,9 @@ before(async()=>{
       privateKey: {
         path: 'test/key.pem'
       },
-      authenticate: async(username,passwordSha256b64)=>{
+      authenticate: async(username,passwordHash)=>{
         const user=credentials[username];
-        if(!user||passwordSha256b64!==user.hash) return null;
+        if(!user||passwordHash!==user.hash) return null;
         return {
           data: user.data,
           token: user.token
@@ -241,41 +253,37 @@ describe('Nonce', ()=>{
     const nonce1 = encrypt(text1);
     const username = 'tester1';
     const hash = credentials.tester1.hash;
-    const response1 = await request('/.auth/test/login', null,{ username, hash, nonce: nonce1 });
-    assert.strictEqual(response1.status, 400);
+    const response1 = await requestFollowRedirect('/test', null,{ username, hash, nonce: nonce1 });
+    assert.strictEqual(response1.status, 401);
     const text2 = `testing|${new Date().getTime()}|${crypto.randomBytes(8).toString('base64')}`;
     const nonce2 = encrypt(text2);
-    const response2 = await request('/.auth/test/login', null,{ username, hash, nonce: nonce2 });
-    assert.strictEqual(response2.status, 400);
+    const response2 = await requestFollowRedirect('/test', null,{ username, hash, nonce: nonce2 });
+    assert.strictEqual(response2.status, 401);
   });
   it('Nonce with no random bytes', async()=>{
     const text = `test|${new Date().getTime()}`;
     const nonce = encrypt(text);
     const username = 'tester1';
     const hash = credentials.tester1.hash;
-    const response = await request('/.auth/test/login', null,{ username, hash, nonce });
-    assert.strictEqual(response.status, 400);
+    const response = await requestFollowRedirect('/test', null,{ username, hash, nonce });
+    assert.strictEqual(response.status, 401);
   });
   it('Expired nonce', async()=>{
     const nonce = 'JE8zbRSy1XSvMG1EE0L6J0RLkkvj_1j8NkURXf1EnEA6cBHxtmMm1NEQecS6LMmR0MTY3vsiV-pDCplsJwv7xw';
     const username = 'tester1';
     const hash = credentials.tester1.hash;
-    const response = await request('/.auth/test/login', null,{ username, hash, nonce });
-    assert.strictEqual(response.status, 400);
+    const response = await requestFollowRedirect('/test', null,{ username, hash, nonce });
+    assert.strictEqual(response.status, 401);
   });
   it('Dummy nonce', async()=>{
     const nonce='nonce';
     const username = 'tester1';
     const hash = credentials.tester1.hash;
-    const response = await request('/.auth/test/login', null,{ username, hash, nonce });
-    assert.strictEqual(response.status, 400);
+    const response = await requestFollowRedirect('/test', null,{ username, hash, nonce });
+    assert.strictEqual(response.status, 401);
   });
 });
 describe('Login', ()=>{
-  it('direct get request to login endpoint', async()=>{
-    const response = await request('/.auth/test/login');
-    assert.strictEqual(response.status, 405);
-  });
   it('Login page', async()=>{
     const response1 = await request('/test');
     assert.strictEqual(response1.status, 401);
@@ -302,39 +310,39 @@ describe('Login', ()=>{
     const username = 'unknown';
     const hash = credentials.tester1.hash;
     const nonce = await getNonce();
-    const response = await request('/.auth/test/login', null,{ username, hash, nonce });
+    const response = await requestFollowRedirect('/test', null,{ username, hash, nonce });
     assert.strictEqual(response.status, 401);
   });
   it('Wrong password', async()=>{
     const username = 'tester1';
     const hash = sha256b64('password');
     const nonce = await getNonce();
-    const response = await request('/.auth/test/login', null,{ username, hash, nonce });
+    const response = await requestFollowRedirect('/test', null,{ username, hash, nonce });
     assert.strictEqual(response.status, 401);
   });
   it('Missing username', async()=>{
     const hash = credentials.tester2.hash;
     const nonce = await getNonce();
-    const response = await request('/.auth/test/login', null,{ hash, nonce });
-    assert.strictEqual(response.status, 400);
+    const response = await requestFollowRedirect('/test', null,{ hash, nonce });
+    assert.strictEqual(response.status, 401);
   });
   it('Missing password hash', async()=>{
     const username = 'tester1';
     const nonce = await getNonce();
-    const response = await request('/.auth/test/login', null,{ username, nonce });
-    assert.strictEqual(response.status, 400);
+    const response = await requestFollowRedirect('/test', null,{ username, nonce });
+    assert.strictEqual(response.status, 401);
   });
   it('Missing nonce', async()=>{
     const username = 'tester1';
     const hash = credentials.tester1.hash;
-    const response = await request('/.auth/test/login', null,{ username, hash });
-    assert.strictEqual(response.status, 400);
+    const response = await requestFollowRedirect('/test', null,{ username, hash });
+    assert.strictEqual(response.status, 401);
   });
   it('Correct password', async()=>{
     const username = 'tester1';
     const hash = credentials.tester1.hash;
     const nonce = await getNonce();
-    const response = await request('/.auth/test/login', null,{ username, hash, nonce });
+    const response = await request('/test', null,{ username, hash, nonce });
     assert.strictEqual(response.status, 303);
     const cookie = response.headers.get('set-cookie').find(it=>it.indexOf('auth_token_')===0);
     const i = cookie.indexOf('=');
@@ -353,49 +361,49 @@ describe('Login', ()=>{
   });
   it('Invalid jwt value', async()=>{
     const cookie1 = 'auth_token_dGVzdA=test';
-    const response1 = await request('/test', { cookie: cookie1 });
+    const response1 = await requestFollowRedirect('/test', { cookie: cookie1 });
     assert.strictEqual(response1.status, 401);
     const cookie2 = 'auth_token_dGVzdA=test; SameSite; HttpOnly;';
-    const response2 = await request('/test', { cookie: cookie2 });
+    const response2 = await requestFollowRedirect('/test', { cookie: cookie2 });
     assert.strictEqual(response2.status, 401);
     const cookie3 = 'auth_token_dGVzdA=eyJhbGciOiJIUzI1NiIsInR5cCI6Imp3dCJ9; SameSite; HttpOnly;';
-    const response3 = await request('/test', { cookie: cookie3 });
+    const response3 = await requestFollowRedirect('/test', { cookie: cookie3 });
     assert.strictEqual(response3.status, 401);
     const cookie4 = 'auth_token_dGVzdA=eyJhbGciOiJIUzI1NiIsInR5cCI6Imp3dCJ9.dummy; SameSite; HttpOnly;';
-    const response4 = await request('/test', { cookie: cookie4 });
+    const response4 = await requestFollowRedirect('/test', { cookie: cookie4 });
     assert.strictEqual(response4.status, 401);
     const cookie5 = 'auth_token_dGVzdA=eyJhbGciOiJIUzI1NiIsInR5cCI6Imp3dCJ9.dummy.signature; SameSite; HttpOnly;';
-    const response5 = await request('/test', { cookie: cookie5 });
+    const response5 = await requestFollowRedirect('/test', { cookie: cookie5 });
     assert.strictEqual(response5.status, 401);
     const cookie6 = 'auth_token_dGVzdA=eyJhbGciOiJIUzI1NiIsInR5cCI6Imp3dCJ9.test.LpPTzNr7-lVjG61BA9_3W8FbhLbvqMuBnfQxvmldWFA; SameSite; HttpOnly;';
-    const response6 = await request('/test', { cookie: cookie6 });
+    const response6 = await requestFollowRedirect('/test', { cookie: cookie6 });
     assert.strictEqual(response6.status, 401);
   });
   it('Invalid jwt signature', async()=>{
     const jwt = 'eyJhbGciOiJIUzI1NiIsInR5cCI6Imp3dCJ9.eyJzdWIiOiJ0ZXN0ZXIxIiwiaWF0IjoxNTcyMjEzMTY3NDM0LCJkYXRhIjp7ImRhdGEiOnsibmFtZSI6IlRlc3RlciAxIiwiaWQiOjF9LCJ0b2tlbiI6ImEifX0.WDfx1h8QzB58nf7Obiij2txw0ro2mkCuqV8wf4fdAv4';
     const cookie = `auth_token_dGVzdA=${jwt}; SameSite; HttpOnly`;
-    const response = await request('/test', { cookie: cookie });
+    const response = await requestFollowRedirect('/test', { cookie: cookie });
     assert.strictEqual(response.status, 401);
   });
   it('Validation', async()=>{
     const username = 'tester1';
     const hash=credentials.tester1.hash;
     const nonce=await getNonce();
-    const response1 = await request('/.auth/test/login', null,{ username, hash, nonce });
+    const response1 = await request('/test', null,{ username, hash, nonce });
     assert.strictEqual(response1.status, 303);
     const cookie = response1.headers.get('set-cookie').find(it=>it.indexOf('auth_token_')===0);
     credentials.tester1.token='c';
     const response2 = await request('/test', { cookie });
     assert.strictEqual(response2.status, 200);
     await delay(350);
-    const response3 = await request('/test', { cookie });
+    const response3 = await requestFollowRedirect('/test', { cookie });
     assert.strictEqual(response3.status, 401);
   });
   it('User data', async()=>{
     const username='tester2';
     const hash=credentials.tester2.hash;
     const nonce=await getNonce();
-    const response1 = await request('/.auth/test/login', null,{ username, hash, nonce });
+    const response1 = await request('/test', null,{ username, hash, nonce });
     assert.strictEqual(response1.status, 303);
     const cookie1 = response1.headers.get('set-cookie').find(it=>it.indexOf('auth_token_')===0);
     credentials.tester2.data.id=4;
@@ -419,7 +427,7 @@ describe('Login', ()=>{
     assert.deepStrictEqual(payload.data.token,credentials.tester2.token);
     assert.strictEqual(payload.data.data.id,4);
     delete(credentials.tester2);
-    const response4 = await request('/test', { cookie: cookie1 });
+    const response4 = await requestFollowRedirect('/test', { cookie: cookie1 });
     assert.strictEqual(response4.status, 401);
   });
 });
@@ -428,7 +436,7 @@ describe('Logout', ()=>{
     const username='tester1';
     const hash=credentials.tester1.hash;
     const nonce=await getNonce();
-    const response1 = await request('/.auth/test/login', null,{ username, hash, nonce });
+    const response1 = await request('/test', null,{ username, hash, nonce });
     assert.strictEqual(response1.status, 303);
     const cookie = response1.headers.get('set-cookie').find(it=>it.indexOf('auth_token_')===0);
     const response2 = await request('/test', { cookie },{ username, hash, nonce });

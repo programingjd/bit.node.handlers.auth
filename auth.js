@@ -190,6 +190,7 @@ const validateNonce=(privateKey,realm,nonce)=>{
  * @property {function(username:string,userData:T):Promise<boolean>} revalidate
  * @property {number} [revalidateAfter]
  * @property {number} [updateUserDataAfter]
+ * @property {{httpOnly:boolean?,secure:boolean?,path:string?}} [cookie]
  * @property {{page:{styles:string}}} login
  */
 
@@ -256,7 +257,7 @@ module.exports=async (options,...handlers)=>{
 <head>
 <meta charset="UTF-8">
 <title>${options.realm||'Login'}</title>
-<script src="./nonce"></script>
+<script src="/.auth/${encodeURIComponent(realm)}/nonce"></script>
 <style>
 html{font:calc(1vmin + 1vmax) sans-serif;width:100%;height:100%;margin:0;padding:0;background:#eee}
 body{
@@ -284,8 +285,7 @@ ${((options.login||{}).page||{}).styles||''}
 <script>
 const sha256b64=async data=>{
   const hash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(data));
-  const hex=Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,'0')).join('');
-  return btoa(hex).replace(/[+]/g,'-').replace(/[/]/g,'_').replace(/[=]+$/,'');
+  return btoa(String.fromCharCode(...new Uint8Array(hash))).replace(/[+]/g,'-').replace(/[/]/g,'_').replace(/[=]+$/,'');
 };
 const f=document.forms.namedItem('login');
 const p=f.querySelector('input[type=password]');
@@ -310,22 +310,48 @@ p.addEventListener('keydown',e=>{
     gz: await gz(loginData),
     br: await br(loginData)
   };
-  const loginPath=`/.auth/${encodeURIComponent(realm)}/login`;
   const logoutPath=`/.auth/${encodeURIComponent(realm)}/logout`;
   const noncePath=`/.auth/${encodeURIComponent(realm)}/nonce`;
   const cookieStart=`auth_token_${b64urlEncode(realm)}=`;
-  const clearCookie=`${cookieStart}; Secure; HttpOnly; SameSite=Strict;`;
+  const cookieOptions=
+    ' path='+((options.cookie||{}).path||'/')+';'+
+    ((options.cookie||{}).secure===false?'':' Secure;')+
+    ((options.cookie||{}).httpOnly===false?'':' HttpOnly;')+
+    ' SameSite=Strict;';
+  const clearCookie=`${cookieStart}; expires=Thu, 01 Jan 1970 00:00:00 GMT; ${cookieOptions}`;
   /**
    * @param {http2.IncomingMessage} request
    * @param {http2.ServerResponse} response
    */
   const loginPage=(request,response)=>{
-    const encoding=bestSupportedEncoding(request.headers);
-    response.writeHead(401, {
-      'Content-Type': 'text/html',
-      'Content-Encoding': encoding
-    });
-    response.end(login[encoding]);
+    if(request.method.toLowerCase()==='post'){
+      (async()=>{
+        let cookie=clearCookie;
+        const q=await body(request);
+        const params=query.parse(q);
+        const username=params['username'];
+        const hash=params['hash'];
+        const nonce=params['nonce'];
+        if(username&&hash&&nonce&&validateNonce(privateKey,realm,nonce)){
+          const data=await options.authenticate(username,hash);
+          if(data){
+            const jwt=jwtEncode(privateKeySha256,username,data);
+            cookie=`${cookieStart}${jwt};${cookieOptions}`;
+          }
+        }
+        response.writeHead(303,{'Location':request.url,'Set-Cookie':cookie});
+        response.end();
+      })();
+    }
+    else{
+      const encoding=bestSupportedEncoding(request.headers);
+      response.writeHead(401,{
+        'Content-Type':'text/html',
+        'Content-Encoding':encoding,
+        'Set-Cookie':clearCookie
+      });
+      response.end(login[encoding]);
+    }
   };
   return {
     /**
@@ -336,7 +362,7 @@ p.addEventListener('keydown',e=>{
      * @returns {AuthAcceptor|null}
      */
     accept: (request,response,hostname,remoteAddress)=>{
-      if(request.url===logoutPath||request.url===noncePath||request.url===loginPath){
+      if(request.url===noncePath||request.url===logoutPath){
         return { request, response, hostname, handler: undefined, accepted: undefined };
       }
       for(const handler of handlers){
@@ -359,38 +385,6 @@ p.addEventListener('keydown',e=>{
         const nonce=createNonce(privateKey,realm);
         response.end(`const nonce='${nonce}';`);
       }
-      else if(request.url===loginPath){
-        const method=request.method.toLowerCase();
-        if(method==='post'){
-          (async()=>{
-            const q=await body(request);
-            const params=query.parse(q);
-            const username=params['username'];
-            const hash=params['hash'];
-            const nonce=params['nonce'];
-            if(username&&hash&&nonce&&validateNonce(privateKey,realm,nonce)){
-              const data=await options.authenticate(username,hash);
-              if(data===null){
-                loginPage(request,response);
-              }
-              else{
-                const jwt=jwtEncode(privateKeySha256,username,data);
-                const cookie=`${cookieStart}${jwt}; Secure; HttpOnly; SameSite=strict;`;
-                response.writeHead(303,{'Location':request.url,'Set-Cookie':cookie});
-                response.end();
-              }
-            }
-            else{
-              response.writeHead(400);
-              response.end();
-            }
-          })();
-        }
-        else{
-          response.writeHead(405);
-          response.end();
-        }
-      }
       else{
         const cookies=request.headers['cookie']||'';
         const i=cookies.indexOf(cookieStart);
@@ -412,7 +406,7 @@ p.addEventListener('keydown',e=>{
                 const updated=await options.getUserData(username);
                 if(!updated) return loginPage(request,response);
                 const jwt=jwtEncode(privateKeySha256,username,updated);
-                const cookie=`${cookieStart}${jwt}; Secure; HttpOnly; SameSite=strict;`;
+                const cookie=`${cookieStart}${jwt};${cookieOptions}`;
                 response.writeHead(303,{'Location':request.url,'Set-Cookie':cookie});
                 response.end();
               }
@@ -421,7 +415,7 @@ p.addEventListener('keydown',e=>{
           }
         }
       }
-    }
+    },
   };
 
 };
