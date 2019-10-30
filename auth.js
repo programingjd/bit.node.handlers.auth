@@ -275,7 +275,7 @@ p.addEventListener('keydown',e=>{
  *   revalidateAfter:number?,
  *   updateUserDataAfter:number?,
  *   cookie:{httpOnly:boolean?,secure:boolean?,path:string?}?,
- *   loginPage:{styles:string?,content:function():Promise<string>?}?
+ *   loginPage:{styles:string?,content:function(realm:string,styles:string):Promise<string>?}?
  * }} options
  * @param {
  *   ...{

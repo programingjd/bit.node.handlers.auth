@@ -128,3 +128,85 @@ const auth = require('@bit/programingjd.node.handlers.auth');
   
   It defaults to `true` (the cookie is not accessible from the page).
 
+- `authenticate`  (function)
+
+  The function used to check the user credentials.
+  
+  Its arguments are:
+  
+  - username (string)
+  
+  - passwordHash (string)
+  
+  The default hashing function is base64 (url safe) of the SHA-256 digest.
+  This can be overridden by changing the default login page content (see below).
+  
+  It returns either `null` if the authentication fails (username, password of nonce are invalid),
+  or the user data that will be stored in the JWT. 
+  
+- `getUserData`  (function)
+
+  The function used to get the user data and update the content of the JWT.
+  
+  Its arguments are:
+  
+  - username (string)
+  
+  It returns either `null` if the user no longer has access rights, or the user data
+  that will be stored in the JWT.
+  
+- `revalidate`  (function)
+
+  The function used to check for JWT token revocation.
+  
+  Its arguments are:
+  
+  - username (string)
+  
+  - userData (object)
+  
+  It returns `true` if the authorization is still valid, and `false` if it has been revoked.
+  
+- `revalidateAfter`  (number)
+
+  The number of milliseconds after which the server should use the `revalidate` function
+  to check if the token has been revoked or not.
+  
+  It defaults to `Number.MAX_SAFE_INTEGER` (it never revalidates).
+  
+- `updateUserDataAfter`  (number)
+
+  The number of milliseconds after which the server should use the `updateUserData` function
+  to update the user data stored in the JWT.
+  
+- `loginPage.styles`  (string)
+
+  Custom styles to apply to the login page.
+  
+- `loginPage.content`  (function)
+
+  An optional function used to create a custom login page.
+  
+  Its arguments are:
+  
+  - realm (string)
+  
+  - styles (string)
+  
+  It returns a Buffer with the data for the response body.
+  
+  The page should `POST` the login request with the `application/x-www-form-urlencoding`
+  content type, including:
+  
+  - `username`
+  
+  - `hash`
+  
+    The password hash.
+  
+  - `nonce`
+  
+    The nonce, retrieved from a call to `` `/.auth/${encodeURIComponent(realm)}/nonce` ``.
+  The nonce only stays valid for a short amount of time, so the call should be made right
+  before the post.
+  
