@@ -7,6 +7,9 @@
 
 Node.js module.
 
+HTTP handler for adding authentication to a list of handlers.
+
+Authorization is stored in a cookie as an unencrypted JSON Web Token ([JWT](https://jwt.io/)).
 
 
 ## Usage
@@ -16,7 +19,57 @@ const http = require('http');
 const auth = require('@bit/programingjd.node.handlers.auth');
 
 (async()=>{
-  const handler = await auth({});
+  // hashing function for passwords: base64 (url safe) of sha256 hash
+  const hash = text=>require('crypto').createHash('sha256').update(text).digest('base64').
+    replace('+','-').replace('/','-').replace('=','');
+  // allowed users and their data
+  const credentials = {
+    user1: {
+      hash: hash('passwordForUser1'),
+      data: {
+        id: 1,
+        name: 'User 1',
+        admin: true
+      }
+    },
+    user2: {
+      hash: hash('passwordForUser2'),
+      data: {
+        id: 2,
+        name: 'User 2',
+        admin: false
+      }
+    }
+  };
+  // handlers that require authentication
+  const handlers = [
+
+  ];
+  // authentication handler
+  const handler = await auth(
+    {
+      primaryKey: {
+        path: 'private.key'
+      },
+      cookie: {
+        secure: false,
+        httpOnly: false
+      },
+      authenticate: async(username,passwordHash)=>{
+        const user = credentials[username];
+        return user && passwordHash === user.passwordHash ? user.data : null;
+      },
+      getUserData: async(username)=>{
+        const user = credentials[username];
+        return user ? user.data : null;
+      },
+      revalidate: async()=>true,
+      revalidateAfter: 3600000, // 1 hour
+      updateUserDataAfter: 86400000 // 1 day
+    },
+    ...handlers
+  );
+
   http.createServer((request, response)=>{
     const accepted = handler.accept(request, response, 'not_used', request.connection.remoteAddress);
     if (accepted) {
@@ -31,28 +84,47 @@ const auth = require('@bit/programingjd.node.handlers.auth');
 
 ## Options
 
-- `root`  (string)
+- `realm`  (string)
 
-  The path of the directory to serve.
+  The name of the protected realm.
   
-  It defaults to `'www'`.
+  It defaults to `'default'`. If your server has multiple authentication handlers for
+  different sets of handlers, then you should specify a different realm name for each
+  authentication handler, because that name is used as the basis for the name of
+  the cookie.
   
-- `prefix`  (string)
+- `privateKey.path`  (string)
 
-  The path prefix to use for serving the files.
+  The path of the private key used for the JWT secret and the generation of the nonce.
   
-  It defaults to `''` (no prefix).
+  Sample code to create a valid key (note that you can increase the modulusLength but this will have the
+  side effect of having longer nonce as well).
   
-  Example:
+  ``` javascript
+  const { privateKey } = require('crypto').generateKeyPairSync('rsa',{
+    modulusLength: 512,
+    privateKeyEncoding: {
+      type: 'pkcs1',
+      format: 'pem',
+    }
+  });
+  require('fs').writeFileSync('private.key',privateKey);
+  ```
   
-  `root = 'www'` and `prefix = 'files'`
-  
-  `/files/doc.html` on the server points to `./www/doc.html` on disk.
-  
-- `disallowSharedCache`  (boolean)
+- `cookie.secure`  (boolean)
 
-  If you require authorization to access these static files, you can prevent browsers
-  from storing the cached data in a shared cache  by setting this option to `true`.
+  If the server is using the handlers with http and not https, then you need to set
+  to disable the secure cookie option.
   
-  It defaults to `false` (caching in a shared cache is allowed).
+  It defaults to `true` (the cookie is sent with the Secure attribute).
+  
+- `cookie.httpOnly`  (boolean)
+
+  If you need the user data to be accessible from javascript on the page, then you
+  need to set httpOnly to `false`. You can then get the cookie from javascript
+  (the cookie name is 'auth_' followed by the base64 (url safe) of the realm name)
+  and then extract the user data from the JWT value (base64 url safe decode the part
+  between the two dots).
+  
+  It defaults to `true` (the cookie is not accessible from the page).
 

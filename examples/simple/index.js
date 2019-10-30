@@ -37,7 +37,7 @@ const fs = require('fs').promises;
       },
       getUserData: async(username)=>{
         const user = users[username];
-        return user ? user.data: null;
+        return user ? user.data : null;
       },
       revalidate: async()=>true
     },

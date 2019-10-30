@@ -39,6 +39,7 @@ function login(){
       if(e.target===div) div.classList.add('hidden');
     },false);
     const f=document.forms.namedItem('login');
+    f.querySelector('input[type=text]').focus();
     const p=f.querySelector('input[type=password]');
     const sha1=async data=>{
       const hash=await crypto.subtle.digest('SHA-1',new TextEncoder().encode(data));
