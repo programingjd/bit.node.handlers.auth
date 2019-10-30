@@ -210,3 +210,19 @@ const auth = require('@bit/programingjd.node.handlers.auth');
   The nonce only stays valid for a short amount of time, so the call should be made right
   before the post.
   
+
+## Login out
+
+  Login out is done by deleting the cookie with the authorization JWT.
+  
+  Since by default the cookie is not accessible from javascript, there's a dedicated
+  endpoint that deletes the cookie: `` `/.auth/${encodeURIComponent(realm)}/logout` ``.
+  
+  The endpoint can be called from the html pages via `XHR` or with `fetch`.
+  
+  
+## Examples
+
+1. [Simple example using the default login page](examples/simple)
+
+2. [Advanced usage with a custom login page](examples/advanced)
