@@ -211,9 +211,9 @@ const auth = require('@bit/programingjd.node.handlers.auth');
   before the post.
   
 
-## Login out
+## Logging out
 
-  Login out is done by deleting the cookie with the authorization JWT.
+  Logging out is done by deleting the cookie with the authorization JWT.
   
   Since by default the cookie is not accessible from javascript, there's a dedicated
   endpoint that deletes the cookie: `` `/.auth/${encodeURIComponent(realm)}/logout` ``.
