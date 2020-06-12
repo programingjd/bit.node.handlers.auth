@@ -48,7 +48,7 @@ const auth = require('@bit/programingjd.node.handlers.auth');
   // authentication handler
   const handler = await auth(
     {
-      primaryKey: {
+      privateKey: {
         path: 'private.key'
       },
       cookie: {
