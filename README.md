@@ -25,7 +25,7 @@ const auth = require('@bit/programingjd.node.handlers.auth');
   // allowed users and their data
   const credentials = {
     user1: {
-      hash: hash('passwordForUser1'),
+      passwordHash: hash('passwordForUser1'),
       data: {
         id: 1,
         name: 'User 1',
@@ -33,7 +33,7 @@ const auth = require('@bit/programingjd.node.handlers.auth');
       }
     },
     user2: {
-      hash: hash('passwordForUser2'),
+      passwordHash: hash('passwordForUser2'),
       data: {
         id: 2,
         name: 'User 2',
