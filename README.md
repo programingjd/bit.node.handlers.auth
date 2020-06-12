@@ -21,7 +21,7 @@ const auth = require('@bit/programingjd.node.handlers.auth');
 (async()=>{
   // hashing function for passwords: base64 (url safe) of sha256 hash
   const hash = text=>require('crypto').createHash('sha256').update(text).digest('base64').
-    replace('+','-').replace('/','-').replace('=','');
+    replace('+','-').replace('/','_').replace('=','');
   // allowed users and their data
   const credentials = {
     user1: {
