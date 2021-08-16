@@ -4,7 +4,6 @@
   "description": "nodejs http handler for wrapping other handlers behind a user/password authentication",
   "main": "auth.js",
   "scripts": {
-    "preinstall": "npm list -g bit-bin -g || npm install bit-bin -g --unsafe-perm",
     "test": "nyc mocha test/auth.spec.js",
     "coverage": "nyc report --reporter=text-lcov | coveralls",
     "tag": "npx bit tag --all 1.0.6",
