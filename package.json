@@ -1,19 +1,21 @@
 {
   "name": "bit.node.handlers.auth",
-  "version": "1.0.0",
+  "version": "1.0.6",
   "description": "nodejs http handler for wrapping other handlers behind a user/password authentication",
   "main": "auth.js",
   "scripts": {
     "preinstall": "npm list -g bit-bin -g || npm install bit-bin -g --unsafe-perm",
     "test": "nyc mocha test/auth.spec.js",
-    "coverage": "nyc report --reporter=text-lcov | coveralls"
+    "coverage": "nyc report --reporter=text-lcov | coveralls",
+    "tag": "npx bit tag --all 1.0.6",
+    "export": "npx bit export"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/programingjd/bit.node.handlers.auth.git"
   },
   "engines": {
-    "node": ">=11.7.0"
+    "node": ">=12.13.0"
   },
   "author": "",
   "license": "MIT",
@@ -22,9 +24,10 @@
   },
   "homepage": "https://github.com/programingjd/bit.node.handlers.auth#readme",
   "devDependencies": {
-    "coveralls": "^3.1.0",
-    "mocha": "^7.1.2",
-    "nyc": "^15.0.1"
+    "coveralls": "^3.1.1",
+    "mocha": "^9.0.3",
+    "nyc": "^15.1.0",
+    "bit-bin": "^14.8.8"
   },
   "bit": {
     "env": {},
