@@ -129,7 +129,11 @@ const jwtDecode=(privateKeySha256,jwt)=>{
   try{
     const signature=jwt.substring(index+1);
     const hmac=crypto.createHmac('SHA256',privateKeySha256);
-    if(signature!==b64urlEncode(hmac.update(jwt.substring(0,index)).digest())) return null;
+    // if(signature!==b64urlEncode(hmac.update(jwt.substring(0,index)).digest())) return null;
+    if(!crypto.timingSafeEqual(
+      b64urlDecode(signature),
+      hmac.update(jwt.substring(0,index)).digest()
+    )) return null;
     const payload=JSON.parse(b64urlDecode(jwt.substring(jwtHeaderBase64.length+1,index)).toString());
     return {
       username:payload.sub,
@@ -380,7 +384,7 @@ module.exports=async (options,...handlers)=>{
      * @param {AuthAcceptor} acceptor
      */
     handle: (acceptor)=>{
-      const { request, response, handler, accepted } = acceptor;
+      const { request, response, handler, accepted }=acceptor;
       if(request.url===logoutPath){
         response.writeHead(302,{'Set-Cookie':clearCookie});
         response.end();
@@ -398,10 +402,10 @@ module.exports=async (options,...handlers)=>{
           const j=cookies.indexOf(';',i+cookieStart.length);
           const jwt=
             j===-1?cookies.substring(i+cookieStart.length):cookies.substring(i+cookieStart.length,j);
-          const decoded = jwtDecode(privateKeySha256,jwt);
+          const decoded=jwtDecode(privateKeySha256,jwt);
           if(!decoded) loginPage(request,response);
           else{
-            const { username, timestamp, data } = decoded;
+            const { username, timestamp, data }=decoded;
             const dt=new Date().getTime()-timestamp;
             (async()=>{
               if(dt>revalidateAfter){
